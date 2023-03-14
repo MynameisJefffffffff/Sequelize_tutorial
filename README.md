@@ -1,0 +1,2 @@
+# Sequelize_tutorial
+Sequelize_tutorial
