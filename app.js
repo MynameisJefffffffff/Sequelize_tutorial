@@ -41,7 +41,8 @@ app.post("/login", async (req, res) => {
     return res.status(401).json({ message: "Invalid password." });
   }
   //once both username and password matched, proceed to generate token
-  const token = jwt.sign(user.id, secretKey);
+  const payload ={username};
+  const token = jwt.sign(payload, secretKey);
   console.log("Login successful", token);
   //res.set('token', token);
   res.status(200).json({ token });
@@ -50,10 +51,11 @@ app.post("/login", async (req, res) => {
 
 //user-info api
 app.get("/user-info", authenticateToken, async (req, res) => {
-  const user = await model.patrons.findOne({where: {username:req.body.username}})
+  let username = req.user.username;
+  const users = await model.patrons.findOne({where: {username}});
 
-  if(user)
-    res.send(user)
+  if(users)
+    res.send(users)
   else
     res.status(404);
 });
