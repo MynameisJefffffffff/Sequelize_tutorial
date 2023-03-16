@@ -1,151 +1,78 @@
+//next task: further insert harsh for password, salt and insert into database
 const express = require("express");
 const app = express();
 app.use(express.json());
 const port = 2000;
 const model = require("./models");
 const jwt = require("jsonwebtoken");
+const bcrypt = require("bcrypt");
 const secretKey = "mysecretkey";
 
-//let users = [];
-
-app.post("/register", (req, res) => {
-  //req.body = {username: "xxhiixxlim@gmail.com", password: "password"}
-  console.log(req.body);
-  const username = req.body.username;
-  const password = req.body.password;
-  
-  
-  // Perform some hashing on the password here if desired
-
+//register api
+app.post("/register", async (req, res) => {
+  const { username, password } = req.body;
   // Check if username already exists
+  const check_user = await model.patrons.findOne({where: {username}})
 
-  async function createNewPatron() {
-    model.patrons
-      .findOne({
-        where: {
-          username: username,
-        },
-      })
-      .then((res) => {
-        console.log(res);
-        if (res) {
-          console.log("got data exist");
-        } else {
-          model.patrons.create({
-            username: username,
-            password: password,
-          });
-        }
-      })
-      .catch((error) => {
-        console.error("Data not exist:");
-      });
-
-    //console.log('New patron created:', allrecord);
+  if(!check_user){
+    // Perform some hashing on the password here if desired
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await model.patrons.create({username ,password: hashedPassword});
+    res.status(200).send("Successfully registered");
   }
-
-  createNewPatron();
-  //}
-
-  // Add user to list
-  //users.push({ username, password });
-  res.send("OK");
+  else{
+    res.status(500).send("Username taken");
+  }
 });
 
-app.post("/login", (req, res) => {
-  //console.log(req.body);
-  const login_username = req.body.username;
-  const login_password = req.body.password;
 
-  async function check_login_func() {
-    model.patrons
-      .findOne({
-        where: {
-          username: login_username,
-          password: login_password,
-        },
-      })
-      .then((data) => {
-        console.log(data);
-        if (data) {
-          //console.log("login successfully");
-          const payload = {
-            username: login_username,
-            password: login_password,
-          };
-          console.log("data", data);
-          const token = jwt.sign(payload, secretKey);
-          console.log("Login successful", token);
-          //res.set('token', token);
-          res.send({ token });
-          console.log("Successful assign token to header");
-        } else {
-          console.log("invalid username or password");
-        }
-      })
-      .catch((err) => {
-        //console.log('lalala')
-        console.error(err);
-      });
-  }
-  check_login_func();
-  
-});
-
-// Fake user information API
-app.get('/user-info', authenticateToken, (req, res) => {
-  async function checkauthenticateToken() {
-  const user = model.patrons
-  .findOne({
-    where: {
-      username: req.body.username,
-    },
-  }) .then((user_data) => {
-    console.log(user_data);
-    res.send(user_data);
-  });
-  
-
+//login api
+app.post("/login", async (req, res) => {
+  //retrieve value from json 
+  const { username, password } = req.body;
+  //find post username data from database data, if data not find, invalid data
+  const user = await model.patrons.findOne({ where: { username } });
   if (!user) {
-    res.sendStatus(404);
-    return;
+    return res.status(401).json({ message: "Invalid username." });
   }
-}checkauthenticateToken();
+  //find post password data from database data, if data not find, invalid data
+  const isPasswordMatch = await bcrypt.compare(password, user.password);
+  if (!isPasswordMatch) {
+    return res.status(401).json({ message: "Invalid password." });
+  }
+  //once both username and password matched, proceed to generate token
+  const token = jwt.sign(user.id, secretKey);
+  console.log("Login successful", token);
+  //res.set('token', token);
+  res.status(200).json({ token });
+});
 
-  //const sensitiveData = { ssn: '123-45-6789', creditCard: '1234-5678-9012-3456' };
- // res.json({ username: user.username, ...sensitiveData });
+
+//user-info api
+app.get("/user-info", authenticateToken, async (req, res) => {
+  const user = await model.patrons.findOne({where: {username:req.body.username}})
+
+  if(user)
+    res.send(user)
+  else
+    res.status(404);
 });
 
 
 // Middleware to validate access token
+// next function will execute after run the whole function, != return
 function authenticateToken(req, res, next) {
   const token = req.headers["token"];
-
-  console.log('aa',token)
-
-    jwt.verify(token, secretKey, (err, user) => {
-      if (err) return res.sendStatus(403);
-      req.user = user;
-      console.log("Success ");
-      next();
-    });
+  if (!token) {
+    return res.status(401).json({ message: 'Access token is missing.' });
+  }
+  jwt.verify(token, secretKey, (err, decodedtoken) => {
+    if (err) return res.sendStatus(403);
+    req.user = decodedtoken;
+    console.log("Success ");
+    next();
+  });
 }
-
-// // API endpoint that returns user transactions if authenticated
-// app.get("/transactions", authenticateToken, (req, res) => {
-//   // Get user ID from authenticated user object
-//   const userId = req.user.id;
-
-//   // Filter transactions based on user ID
-//   const userTransactions = transactions.filter((t) => t.userId === userId);
-
-//   // Return transactions if user has any, otherwise return message
-//   if (userTransactions.length > 0) {
-//     res.json(userTransactions);
-//   } else {
-//     res.json({ message: "No transactions found for user" });
-//   }
-// });
 
 app.listen(port, () => {
   console.log("Server listening on port ", port);
