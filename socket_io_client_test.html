@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Socket.IO Client</title>
+  <!-- Include Socket.IO client library -->
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+  <h1>Socket.IO Client</h1>
+
+  <script>
+    // Connect to the Socket.IO server
+    const socket = io();
+
+    // Listen for the 'balanceChange' event emitted from the server
+    socket.on('balanceChange', (data) => {
+      alert(data.gpId + data.secureToken);
+      console.log('Received balance change data:', data);
+      // Now you have access to the data emitted by io.emit on the server
+      // You can use the 'data' object as needed for your application
+    });
+
+    // Add other client-side code as needed
+  </script>
+</body>
+</html>

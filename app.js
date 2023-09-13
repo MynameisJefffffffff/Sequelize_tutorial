@@ -1,21 +1,31 @@
 //next task: further insert harsh for password, salt and insert into database
-const express = require("express");
-const app = express();
-app.use(express.json());
-const port = 2000; //2000
-const model = require("./models");
-const jwt = require("jsonwebtoken");
-const bcrypt = require("bcrypt");
-const secretKey = "mysecretkey";
-const bodyParser = require("body-parser");
-app.use(bodyParser.json());
-const axios = require("axios");
-const param = require("./param.json");
+const express        = require("express");
+const app            = express();
+const port           = 2000; //2000
+const model          = require("./models");
+const jwt            = require("jsonwebtoken");
+const bcrypt         = require("bcrypt");
+const secretKey      = "mysecretkey";
+const bodyParser     = require("body-parser");
+const axios          = require("axios");
+const param          = require("./param.json");
+const Joi            = require('joi');
+const http           = require('http');
+const { Server }     = require('socket.io');
+const server         = http.createServer(app);
+const { io }         = require("socket.io-client");
+const socket         = io("http://127.0.0.1:3001", { autoConnect: true, reconnection: true, reconnectionDelay: 1000 });
+
 const requestOptions = {
   headers: {
     "Content-Type": "application/json",
   },
 };
+
+app.set('case sensitive routing', true)
+app.use(express.json());
+app.use(bodyParser.json());
+// Socket.IO connection handling
 
 
 //register api
@@ -228,6 +238,91 @@ app.post("/node_to_yii_withdraw", async (req, res) => {
     });
 });
 
-app.listen(port, () => {
+
+//healthcheck api
+app.get("/api/HealthCheck", async (req, res) => {
+  try {
+    
+    res.json({ status: 'ok' });
+  } catch (error) {}
+});
+
+
+app.get('/', function(req, res){
+  res.sendFile(__dirname +'/socket_io_client_test.html');});
+
+// Middleware to validate request body against schema
+const validateRequest = (req, res, next) => {
+  const { error } = schema.validate(req.body);
+  if (error) {
+      return res.status(200).json({ errorCode: "ERR004" });
+  }
+  next();
+};
+
+//Notify Balance Change api
+app.post("/api/NotifyBalanceChange", async (req, res) => {
+  try {
+
+    // Define schema using Joi
+    const schema = Joi.object({
+      gsId: Joi.string().required(),
+      gpId: Joi.string().required(),
+      command: Joi.string().required(),
+      requestId: Joi.string().required(),
+      data: Joi.object({
+          playerId: Joi.string().required(),
+          skinId: Joi.string().required(),
+          secureToken: Joi.string().required(),
+          balanceChangeDateTime: Joi.string().isoDate().required(),
+          balanceArray: Joi.array().items(Joi.object({
+              balanceType: Joi.string().valid('cashable').required(),
+              balanceAmt: Joi.number().integer().required()
+          })).required()
+      }).required()
+    });
+
+    // Validate request body schema
+    const { error } = schema.validate(req.body);
+    if (error) {
+        res.status(200).json({ errorCode: "ERR004" });
+    }
+
+    const body = req.body;
+
+    //retrieve all variable from request body
+    const { gsId, gpId, command, requestId, data }                              = req.body;
+    const {playerId, skinId, secureToken, balanceChangeDateTime, balanceArray}  = data;
+    const {balanceType, balanceAmt}                                             = balanceArray;
+    let text = [];
+    //for loop to get each object from balanceArray
+    //for (let i = 0; i < balanceArray.length; i++) {
+      //do something here 
+      //balanceArray[i]
+      //text.push( balanceArray[i]);
+    //}
+    
+    res.status(200).send();
+
+    //use web socket broadcast received req.body from Playtech to egs
+    
+
+
+    socket.emit('balanceChange',body);
+    //io.on('connection', (socket) => {
+//
+    //    socket.emit('balanceChange', {
+    //      body
+    //    });
+  //
+    //  socket.on('disconnect', () => {
+    //    console.log('Socket.IO client disconnected');
+    //  });
+    //});
+
+  } catch (error) {}
+});
+
+server.listen(port, () => {
   console.log("Server listening on port ", port);
 });
